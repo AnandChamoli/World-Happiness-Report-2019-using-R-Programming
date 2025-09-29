@@ -1,0 +1,176 @@
+---
+title: 'DAT 301: Project 1: World Happiness Report'
+author: "Anand Chamoli"
+date: "2025-09-26"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+1. Introduction
+
+In this project, I analyze the 2019 World Happiness Report dataset, which is published by the United Nations Sustainable Development Solutions Network. The dataset measures global happiness using survey data, where people self-report their life satisfaction on a scale from 0 (worst possible life) to 10 (best possible life).
+It also includes factors that may explain happiness, such as GDP per capita, social support, healthy life expectancy, freedom to make life choices, generosity, and perceptions of corruption.
+
+Research Questions
+
+ - Which factors are most strongly associated with happiness?
+
+ - How do happiness levels differ across countries and regions?
+
+ - Can we build a simple regression model to predict happiness scores?
+
+
+2. Data Loading
+
+We loaded the dataset from Kaggle (World Happiness Report 2019). The dataset contains country-level observations. The column names are long and not user-friendly, so we will rename them to shorter, more meaningful names.
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(corrplot)
+library(dplyr)
+
+setwd("/Users/anandchamoli/RegressionExplorer")
+
+happiness = read.csv("2019.csv")
+str(happiness)
+head(happiness)
+```
+3. Data Wrangling
+
+Here, we renamed variables for clarity and selected only the relevant columns. We then checked for missing values and used na.omit() to ensure a clean analysis.
+
+```{r}
+data = happiness %>%
+  rename(Country = Country.or.region, GDP = GDP.per.capita, Support = Social.support, Life = Healthy.life.expectancy, Freedom = Freedom.to.make.life.choices, Corruption = Perceptions.of.corruption) %>%
+  select(Country, Score, GDP, Support, Life, Freedom, Generosity, Corruption) 
+
+# checking missing values
+colSums(is.na(data))
+
+# drop rows with missing values
+data = na.omit(data)
+```
+
+4. Exploratory Data Analysis (EDA)
+
+4.1 Stats Summary: This gives us an overview of the distribution of happiness scores, GDP per capita, life expectancy, and social support.
+
+```{r}
+summary(data$Score)
+summary(data[, c("GDP", "Life", "Support")])
+```
+4.2 Distribution of Happiness Scores: Most countries have happiness scores between 4 and 6. Very few countries score above 8 or below 3, making the distribution slightly skewed to the lower side.
+
+```{r}
+ggplot(data, aes(x = Score)) + geom_histogram(bins = 20, fill = "turquoise", color = "white") + labs(title = "Distribution of Happiness Scores")
+```
+
+4.3 Average Happiness by Countries: Since there are many countries, this chart is crowded. To simplify, we also highlight the Top 10 and Bottom 10 countries.
+
+```{r}
+data %>%
+  group_by(Country) %>%
+  summarise(mean_score = mean(Score, na.rm = T)) %>%
+  ggplot(aes(x = reorder(Country, mean_score), y = mean_score)) + geom_col(fill = "orange") + coord_flip() + labs(title = "Average Happiness by Country")
+```
+
+
+4.4 Top 10 and Bottom 10 Countries by Happiness: 
+
+ - The Top 10 countries include Finland, Denmark, and Norway, all with strong economies and high social support.
+
+ - The Bottom 10 countries include South Sudan and Afghanistan, where war, poverty, and instability lower happiness levels.
+ 
+```{r}
+country_stats = data %>% 
+  group_by(Country) %>%
+  summarise(mean_score = mean(Score, na.rm = T)) 
+
+top_10 = country_stats %>% arrange(desc(mean_score)) %>% head(10)
+bottom_10 = country_stats %>% arrange(mean_score) %>% head(10)
+
+top_bottom = bind_rows(top_10,bottom_10)
+
+ggplot(top_bottom, aes(x=reorder(Country, mean_score), y = mean_score)) + geom_col(fill = "tomato2") + coord_flip() + labs(title = "Top 10 and Bottom 10 Countries by Happiness Scores", x = "Country", y = "Average Happiness Score")
+```
+
+
+4.5 Correlation Analysis:
+
+-  Happiness Score shows strong positive correlations with GDP, Life Expectancy, and Social Support.
+
+ - Freedom also has a significant relationship.
+
+ - Generosity and Corruption show weaker connections.
+ 
+```{r}
+corr_data = data %>%
+  select(Score, GDP, Support, Life, Freedom, Generosity, Corruption)
+
+corr_matrix = cor(corr_data, use = "complete.obs")
+
+corrplot(corr_matrix, method = "circle", type = "upper")
+```
+5. Data Visualization
+
+ - Countries with higher GDP per capita tend to report higher happiness.
+
+ - Countries with longer healthy life expectancy also report higher happiness.
+
+```{r}
+ggplot(data, aes(x = GDP, y = Score,)) + geom_point(color = "magenta", alpha = 0.6) + geom_smooth(method = "lm", color = "tomato4") + labs(title = "Happiness Vs GDP Per Capita")
+
+ggplot(data, aes(x = Life, y = Score,)) + geom_point(color = "red", alpha = 0.6) + geom_smooth(method = "lm", color = "black") + labs(title = "Happiness Vs Life Expectancy")
+```
+
+6. Regression Analysis
+
+ - All four predictors (GDP, Life Expectancy, Support, and Freedom) are statistically significant (p < 0.05).
+
+ - Freedom has the largest coefficient, showing the strongest influence on happiness.
+
+ - The model explains about 77% of the variation in Happiness Scores (R² = 0.77).
+
+ - Prediction errors are small, with residuals centered around zero, suggesting a good model fit.
+
+```{r}
+regression_model = lm(Score ~ GDP + Life + Support + Freedom, data = data)
+summary(regression_model)
+```
+
+7. Conclusion: From this analysis, we find that GDP, Life Expectancy, Social Support, and Freedom to make life choices are the strongest drivers of happiness across countries.
+
+ - Wealthier countries with longer life expectancy and strong social systems rank higher in happiness.
+
+ - Freedom plays the largest role, suggesting that economic prosperity alone does not guarantee happiness — personal and social freedoms are equally important.
+
+ - The top-ranked countries (Finland, Denmark, Norway) combine high GDP, life expectancy, and strong governance.
+
+ - Countries with conflict and poverty remain at the bottom, highlighting how instability impacts well-being.
+
+
+8. Limitations
+
+ - Only 2019 data is used; results may change across years.
+
+ - Happiness is self-reported and may vary due to cultural biases.
+
+ - Variables like corruption are hard to quantify.
+
+9. Future Work
+
+ - Extend analysis to 2015–2019 to see trends.
+
+ - Include cultural, political, or environmental variables for richer insights.
+
+
+10. References
+
+World Happiness Report 2019 (Kaggle)
+
